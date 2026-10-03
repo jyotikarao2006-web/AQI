@@ -1,0 +1,8 @@
+Django>=5.0
+numpy
+pandas
+joblib
+scikit-learn==1.6.1
+xgboost>=3.0
+tensorflow>=2.17
+keras>=3.13
