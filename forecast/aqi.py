@@ -1,4 +1,4 @@
-"""Shared constants: input fields, Indian (CPCB) AQI bands and city presets."""
+"""Shared constants: input fields, Indian (CPCB) AQI bands, city presets and Indian states."""
 
 # name must match the training column names exactly.
 FIELDS = [
@@ -45,6 +45,48 @@ CITIES = [
     {"name": "Pune", "lat": 18.520, "lon": 73.857},
     {"name": "Ahmedabad", "lat": 23.023, "lon": 72.572},
 ]
+
+# Indian states and union territories, located at their capital. Used to fetch live data
+# from Open-Meteo. Sorted A-Z; the UI lets the user pick one.
+STATES = [
+    {"name": "Andaman and Nicobar Islands", "capital": "Port Blair", "lat": 11.623, "lon": 92.727},
+    {"name": "Andhra Pradesh", "capital": "Amaravati", "lat": 16.573, "lon": 80.358},
+    {"name": "Arunachal Pradesh", "capital": "Itanagar", "lat": 27.084, "lon": 93.605},
+    {"name": "Assam", "capital": "Dispur", "lat": 26.144, "lon": 91.790},
+    {"name": "Bihar", "capital": "Patna", "lat": 25.594, "lon": 85.138},
+    {"name": "Chandigarh", "capital": "Chandigarh", "lat": 30.733, "lon": 76.779},
+    {"name": "Chhattisgarh", "capital": "Raipur", "lat": 21.251, "lon": 81.630},
+    {"name": "Dadra and Nagar Haveli and Daman and Diu", "capital": "Daman", "lat": 20.397, "lon": 72.832},
+    {"name": "Delhi", "capital": "New Delhi", "lat": 28.614, "lon": 77.209},
+    {"name": "Goa", "capital": "Panaji", "lat": 15.490, "lon": 73.828},
+    {"name": "Gujarat", "capital": "Gandhinagar", "lat": 23.215, "lon": 72.637},
+    {"name": "Haryana", "capital": "Chandigarh", "lat": 30.733, "lon": 76.779},
+    {"name": "Himachal Pradesh", "capital": "Shimla", "lat": 31.105, "lon": 77.173},
+    {"name": "Jammu and Kashmir", "capital": "Srinagar", "lat": 34.084, "lon": 74.797},
+    {"name": "Jharkhand", "capital": "Ranchi", "lat": 23.344, "lon": 85.310},
+    {"name": "Karnataka", "capital": "Bengaluru", "lat": 12.972, "lon": 77.595},
+    {"name": "Kerala", "capital": "Thiruvananthapuram", "lat": 8.524, "lon": 76.936},
+    {"name": "Ladakh", "capital": "Leh", "lat": 34.153, "lon": 77.577},
+    {"name": "Lakshadweep", "capital": "Kavaratti", "lat": 10.567, "lon": 72.642},
+    {"name": "Madhya Pradesh", "capital": "Bhopal", "lat": 23.260, "lon": 77.413},
+    {"name": "Maharashtra", "capital": "Mumbai", "lat": 19.076, "lon": 72.878},
+    {"name": "Manipur", "capital": "Imphal", "lat": 24.817, "lon": 93.937},
+    {"name": "Meghalaya", "capital": "Shillong", "lat": 25.578, "lon": 91.893},
+    {"name": "Mizoram", "capital": "Aizawl", "lat": 23.727, "lon": 92.718},
+    {"name": "Nagaland", "capital": "Kohima", "lat": 25.667, "lon": 94.108},
+    {"name": "Odisha", "capital": "Bhubaneswar", "lat": 20.296, "lon": 85.825},
+    {"name": "Puducherry", "capital": "Puducherry", "lat": 11.934, "lon": 79.830},
+    {"name": "Punjab", "capital": "Chandigarh", "lat": 30.733, "lon": 76.779},
+    {"name": "Rajasthan", "capital": "Jaipur", "lat": 26.912, "lon": 75.787},
+    {"name": "Sikkim", "capital": "Gangtok", "lat": 27.339, "lon": 88.610},
+    {"name": "Tamil Nadu", "capital": "Chennai", "lat": 13.083, "lon": 80.271},
+    {"name": "Telangana", "capital": "Hyderabad", "lat": 17.385, "lon": 78.487},
+    {"name": "Tripura", "capital": "Agartala", "lat": 23.831, "lon": 91.286},
+    {"name": "Uttar Pradesh", "capital": "Lucknow", "lat": 26.847, "lon": 80.947},
+    {"name": "Uttarakhand", "capital": "Dehradun", "lat": 30.317, "lon": 78.032},
+    {"name": "West Bengal", "capital": "Kolkata", "lat": 22.573, "lon": 88.364},
+]
+STATES_BY_NAME = {s["name"].lower(): s for s in STATES}
 
 
 def band_for(aqi: float) -> dict:

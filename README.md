@@ -17,7 +17,24 @@ Open http://127.0.0.1:8000
 |---|---|---|
 | Live AQI estimate while you edit conditions | XGBoost (10 inputs) | `POST /api/predict/` |
 | 7-day outlook + trend | LSTM (24 steps x 12 features) | `POST /api/forecast/` |
+| Last 24 hours for an Indian state (Open-Meteo) | XGBoost per hour | `GET /api/live/?state=Maharashtra` |
 | File check | n/a | `GET /api/health/` |
+
+## Live data from Open-Meteo
+
+Pick a state or union territory in the header. The backend (`forecast/openmeteo.py`) calls the free,
+key-less [Open-Meteo](https://open-meteo.com/) air-quality and weather APIs for that state's capital and
+returns the last 24 hourly rows (India time). The page then:
+
+- fills the Conditions form with the newest hour and shows its AQI,
+- shows a 24-hour chart and table (estimated AQI per hour from the XGBoost model),
+- feeds the 24 rows to the LSTM as its history window ("Use the last 24 hours loaded for the selected state").
+
+Notes: values are Open-Meteo model data (CAMS air quality), not CPCB ground stations; CO is converted from
+µg/m³ to mg/m³; wind is requested in m/s; results are cached for 10 minutes per location; the server needs
+outbound internet access to `air-quality-api.open-meteo.com` and `api.open-meteo.com`.
+`POST /api/forecast/` also accepts `{"state": "Goa"}` and fetches the 24 hours itself.
+Open-Meteo's free tier is for non-commercial use; check their terms before deploying commercially.
 
 ## Things to check against your training notebook
 

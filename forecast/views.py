@@ -10,8 +10,9 @@ from django.shortcuts import render
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_GET, require_POST
 
-from . import ml
-from .aqi import BANDS, CITIES, FEATURES, FIELDS, LSTM_FEATURES, RANGES, band_for
+from . import ml, openmeteo
+from .aqi import (BANDS, CITIES, FEATURES, FIELDS, LSTM_FEATURES, RANGES, STATES, STATES_BY_NAME,
+                  band_for)
 
 
 log = logging.getLogger(__name__)
@@ -59,7 +60,7 @@ def _fail(exc, status=400):
 @ensure_csrf_cookie
 def index(request):
     return render(request, "forecast/index.html", {
-        "config": {"fields": FIELDS, "bands": BANDS, "cities": CITIES},
+        "config": {"fields": FIELDS, "bands": BANDS, "cities": CITIES, "states": STATES},
     })
 
 
@@ -67,6 +68,47 @@ def index(request):
 def health(request):
     files = {p.name: p.exists() for p in ml.settings.MODEL_DIR.iterdir()} if ml.settings.MODEL_DIR.exists() else {}
     return JsonResponse({"status": "ok", "model_files": files})
+
+
+@require_GET
+def live(request):
+    """Last 24 hours of pollution + weather for an Indian state, from Open-Meteo.
+
+    GET /api/live/?state=Maharashtra
+    Returns the 24 hourly rows (oldest first), each with an estimated AQI from the XGBoost model,
+    plus the newest row as `latest` so the page can fill in the Conditions form.
+    """
+    name = (request.GET.get("state") or "").strip()
+    state = STATES_BY_NAME.get(name.lower())
+    if not state:
+        return _fail(BadInput("Choose a state or union territory of India."))
+    try:
+        rows = openmeteo.fetch_last_24h(state["lat"], state["lon"])
+    except openmeteo.OpenMeteoError as e:
+        log.warning("Open-Meteo failed for %s: %s", state["name"], e)
+        return _fail(e, 502)
+    except Exception as e:
+        log.exception("live data failed")
+        return _fail(f"Could not load live data: {e}", 500)
+
+    # Per-hour AQI estimate. If the model is unavailable the raw readings are still returned.
+    try:
+        for r in rows:
+            r["aqi"] = _aqi_payload(ml.predict_xgb({f: r[f] for f in FEATURES}))["aqi"]
+    except Exception:
+        log.warning("could not estimate AQI from live data", exc_info=True)
+        for r in rows:
+            r["aqi"] = None
+    latest = rows[-1]
+    return JsonResponse({
+        "state": state["name"], "location": state["capital"],
+        "latitude": state["lat"], "longitude": state["lon"],
+        "from": rows[0]["time"], "to": latest["time"],
+        "rows": rows,
+        "latest": {f: latest[f] for f in FEATURES},
+        "latest_aqi": _aqi_payload(latest["aqi"]) if latest["aqi"] is not None else None,
+        "source": "Open-Meteo (CAMS air-quality model and weather model; not ground-station readings)",
+    })
 
 
 @require_POST
@@ -88,10 +130,19 @@ def forecast(request):
     """7-day outlook from a 24-step window (LSTM)."""
     try:
         data = _body(request)
+        history = data.get("history")
+        state = STATES_BY_NAME.get(str(data.get("state") or "").strip().lower())
+        if state and not history:  # "use the last 24 hours for this state" without sending rows
+            try:
+                history = openmeteo.fetch_last_24h(state["lat"], state["lon"])
+            except openmeteo.OpenMeteoError as e:
+                return _fail(e, 502)
+        if state:
+            data.setdefault("Latitude", state["lat"])
+            data.setdefault("Longitude", state["lon"])
         lat = _number(data, "Latitude")
         lon = _number(data, "Longitude")
 
-        history = data.get("history")
         if history:
             if not isinstance(history, list) or len(history) < ml.WINDOW:
                 raise BadInput(f"History needs at least {ml.WINDOW} rows.")
@@ -124,7 +175,7 @@ def forecast(request):
             lo, hi = ml.settings.LSTM_OUTPUT_RANGE
             note = (f"No target scaler was found, so the LSTM output was mapped onto an AQI range of {lo} to {hi}. "
                     "Add ml_models/lstm_y_scaler.pkl for exact values.")
-        return JsonResponse({"days": days, "trend": {"label": label, "slope": round(slope, 1)}, "note": note})
+        return JsonResponse({"days": days, "trend": {"label": label, "slope": round(slope, 1)}})
     except BadInput as e:
         return _fail(e)
     except Exception as e:

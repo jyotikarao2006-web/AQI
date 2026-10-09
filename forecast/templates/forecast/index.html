@@ -12,8 +12,8 @@
 <body>
   <header class="top">
     <h1>AQI forecaster</h1>
-    <label class="city">City
-      <select id="city"></select>
+    <label class="city">State
+      <select id="state"></select>
     </label>
   </header>
 
@@ -29,7 +29,23 @@
         <div class="names" id="bandNames"></div>
       </div>
       <p class="advice" id="advice"></p>
+      <p class="live-status" id="liveStatus" aria-live="polite"></p>
       <p class="error" id="error" role="alert" hidden></p>
+    </section>
+
+    <section class="block" id="last24">
+      <div class="block-head">
+        <h2>Last 24 hours</h2>
+        <button type="button" class="presets-btn" id="refreshLive">Refresh</button>
+      </div>
+      <p class="note" id="liveMeta">Choose a state to load its last 24 hours of air quality and weather.</p>
+      <p class="error" id="liveError" role="alert" hidden></p>
+      <div id="liveResult" hidden>
+        <div class="chart"><canvas id="liveChart" aria-label="Estimated AQI for each of the last 24 hours"></canvas></div>
+        <div class="table-wrap">
+          <table id="liveTable"></table>
+        </div>
+      </div>
     </section>
 
     <section class="block" id="conditions">
@@ -53,18 +69,15 @@
       <div class="controls">
         <fieldset>
           <legend>Starting point</legend>
-          <label class="radio"><input type="radio" name="src" value="steady" checked> Hold the conditions above steady for the past 24 steps</label>
+          <label class="radio"><input type="radio" name="src" value="live" checked> Use the last 24 hours loaded for the selected state (Open-Meteo)</label>
+          <label class="radio"><input type="radio" name="src" value="steady"> Hold the conditions above steady for the past 24 steps</label>
           <label class="radio"><input type="radio" name="src" value="csv"> Use my own last 24 readings</label>
           <div class="csv" id="csvBox" hidden>
             <input type="file" id="csvFile" accept=".csv">
             <button type="button" class="link" id="csvTemplate">Download a CSV template</button>
           </div>
         </fieldset>
-        <details id="outlook">
-          <summary>Add a weather outlook (optional)</summary>
-          <p class="note">Without an outlook, each day repeats the last known conditions, so the forecast reflects the trend already in your data.</p>
-          <div class="outlook-wrap"><table id="outlookTable"></table></div>
-        </details>
+        
       </div>
 
       <p class="error" id="weekError" role="alert" hidden></p>

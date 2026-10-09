@@ -6,3 +6,4 @@ scikit-learn==1.6.1
 xgboost>=3.0
 tensorflow>=2.17
 keras>=3.13
+tzdata  # IANA timezones on Windows (Open-Meteo times are Asia/Kolkata)

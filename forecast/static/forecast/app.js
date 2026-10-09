@@ -1,6 +1,6 @@
 (() => {
   const cfg = JSON.parse(document.getElementById("config").textContent);
-  const { fields: FIELDS, bands: BANDS, cities: CITIES } = cfg;
+  const { fields: FIELDS, bands: BANDS, states: STATES } = cfg;
   const $ = (s) => document.querySelector(s);
 
   const PRESETS = {
@@ -8,7 +8,6 @@
     typical: Object.fromEntries(FIELDS.map((f) => [f.name, f.default])),
     smog:    { "PM2.5": 260, PM10: 420, NO2: 80, SO2: 20, CO: 3.5, O3: 25, Temperature: 12, Humidity: 70, WindSpeed: 1, Rainfall: 0 },
   };
-  const OUTLOOK_FIELDS = ["Temperature", "Humidity", "WindSpeed", "Rainfall"];
 
   const csrf = () => (document.cookie.split("; ").find((c) => c.startsWith("csrftoken=")) || "").split("=")[1];
   async function api(path, body) {
@@ -21,11 +20,18 @@
     if (!res.ok) throw new Error(data.error || `Request failed (${res.status}).`);
     return data;
   }
+  async function getJSON(path) {
+    const res = await fetch(path, { headers: { Accept: "application/json" } });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || `Request failed (${res.status}).`);
+    return data;
+  }
 
-  // ---- city -----------------------------------------------------------
-  const citySel = $("#city");
-  CITIES.forEach((c, i) => citySel.add(new Option(c.name, i)));
-  const city = () => CITIES[citySel.value];
+  // ---- state ----------------------------------------------------------
+  const stateSel = $("#state");
+  STATES.forEach((s, i) => stateSel.add(new Option(s.name, i)));
+  stateSel.value = STATES.findIndex((s) => s.name === "Delhi");
+  const state = () => STATES[stateSel.value];
 
   // ---- condition fields ------------------------------------------------
   const fieldsEl = $("#fields");
@@ -67,37 +73,105 @@
       if (mine === seq) showError("Could not get a prediction: " + e.message);
     }
   }
-  fieldsEl.addEventListener("input", () => { clearTimeout(timer); timer = setTimeout(predict, 350); });
+  fieldsEl.addEventListener("input", () => {
+    clearTimeout(timer);
+    timer = setTimeout(predict, 350);
+    $("#liveStatus").textContent = "Conditions edited by hand.";
+  });
   document.querySelectorAll("[data-preset]").forEach((b) =>
     b.addEventListener("click", () => {
       Object.entries(PRESETS[b.dataset.preset]).forEach(([k, v]) => (input(k).value = v));
+      $("#liveStatus").textContent = "Example conditions.";
       predict();
     }));
 
-  // ---- weather outlook table -------------------------------------------
-  const table = $("#outlookTable");
-  const labelOf = (n) => FIELDS.find((f) => f.name === n);
-  table.innerHTML = `<thead><tr><th>Day</th>${OUTLOOK_FIELDS.map((n) => `<th>${labelOf(n).label} (${labelOf(n).unit})</th>`).join("")}</tr></thead><tbody>${
-    [...Array(7)].map((_, d) => `<tr><th>Day ${d + 1}</th>${OUTLOOK_FIELDS.map((n) =>
-      `<td><input type="number" data-day="${d}" data-name="${n}" step="${labelOf(n).step}" aria-label="${labelOf(n).label}, day ${d + 1}"></td>`).join("")}</tr>`).join("")
-  }</tbody>`;
-  const outlookEl = $("#outlook");
-  outlookEl.addEventListener("toggle", () => {
-    if (!outlookEl.open) return;
-    table.querySelectorAll("input").forEach((i) => { if (i.value === "") i.value = input(i.dataset.name).value; });
-  });
-  const readOutlook = () => [...Array(7)].map((_, d) => {
-    const row = {};
-    table.querySelectorAll(`input[data-day="${d}"]`).forEach((i) => { if (i.value !== "") row[i.dataset.name] = i.value; });
-    return row;
-  });
+  // ---- last 24 hours from Open-Meteo -----------------------------------
+  let live = null;        // { state, rows, ... } from /api/live/
+  let liveChart, liveSeq = 0;
+  const bandOf = (aqi) => BANDS.find((b) => aqi <= b.max) || BANDS[BANDS.length - 1];
+  const hourLabel = (iso) => {
+    const d = new Date(iso);
+    return d.toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", hour12: true });
+  };
+  const liveErr = $("#liveError"), refreshBtn = $("#refreshLive");
+
+  function renderLive(d) {
+    $("#liveResult").hidden = false;
+    $("#liveMeta").textContent =
+      `${d.state} (${d.location}), ${hourLabel(d.from)} to ${hourLabel(d.to)}, India time. ` +
+      `Source: ${d.source}.`;
+
+    const cols = FIELDS.map((f) => f.name);
+    $("#liveTable").innerHTML =
+      `<thead><tr><th>Hour</th><th>Est. AQI</th>${FIELDS.map((f) => `<th>${f.label}<br><small>${f.unit}</small></th>`).join("")}</tr></thead><tbody>${
+        [...d.rows].reverse().map((r) => {
+          const color = r.aqi == null ? "" : bandOf(r.aqi).color;
+          return `<tr><td>${hourLabel(r.time)}</td><td><span class="dot" style="--c:${color}"></span>${r.aqi ?? "–"}</td>${
+            cols.map((c) => `<td>${r[c]}</td>`).join("")}</tr>`;
+        }).join("")
+      }</tbody>`;
+
+    if (liveChart) liveChart.destroy();
+    const hasAqi = d.rows.every((r) => r.aqi != null);
+    const key = hasAqi ? "aqi" : "PM2.5";
+    liveChart = new Chart($("#liveChart"), {
+      type: "line",
+      data: {
+        labels: d.rows.map((r) => new Date(r.time).toLocaleTimeString("en-IN", { hour: "numeric", hour12: true })),
+        datasets: [{
+          label: hasAqi ? "Estimated AQI" : "PM2.5 (µg/m³)",
+          data: d.rows.map((r) => r[key]), borderColor: "#1B2A33", borderWidth: 2, tension: 0.3, pointRadius: 4,
+          pointBackgroundColor: d.rows.map((r) => (hasAqi ? bandOf(r.aqi).color : "#1B2A33")),
+          pointBorderColor: "#1B2A33",
+        }],
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false },
+          tooltip: { callbacks: { title: (c) => hourLabel(d.rows[c[0].dataIndex].time) } } },
+        scales: { y: { beginAtZero: true, grid: { display: false } }, x: { grid: { display: false } } },
+      },
+      plugins: hasAqi ? [bandPlugin] : [],
+    });
+  }
+
+  async function loadLive() {
+    const mine = ++liveSeq;
+    const s = state();
+    liveErr.hidden = true;
+    refreshBtn.disabled = true;
+    $("#liveStatus").textContent = `Loading the last 24 hours for ${s.name}…`;
+    try {
+      const d = await getJSON(`/api/live/?state=${encodeURIComponent(s.name)}`);
+      if (mine !== liveSeq) return;
+      live = d;
+      // newest hour -> Conditions form -> big AQI reading
+      Object.entries(d.latest).forEach(([k, v]) => { if (input(k)) input(k).value = v; });
+      $("#liveStatus").textContent =
+        `Live: ${d.state} (${d.location}), latest hour ${hourLabel(d.to)}. Edit any value to explore "what if".`;
+      renderLive(d);
+      predict();
+    } catch (e) {
+      if (mine !== liveSeq) return;
+      live = null;
+      liveErr.textContent = e.message;
+      liveErr.hidden = false;
+      $("#liveResult").hidden = true;
+      $("#liveStatus").textContent = `Could not load live data for ${s.name}.`;
+    } finally {
+      if (mine === liveSeq) refreshBtn.disabled = false;
+    }
+  }
+  stateSel.addEventListener("change", loadLive);
+  refreshBtn.addEventListener("click", loadLive);
 
   // ---- history source ---------------------------------------------------
   const csvBox = $("#csvBox"), csvFile = $("#csvFile");
+  const srcValue = () => document.querySelector('input[name="src"]:checked').value;
   document.querySelectorAll('input[name="src"]').forEach((r) =>
-    r.addEventListener("change", () => (csvBox.hidden = document.querySelector('input[name="src"]:checked').value !== "csv")));
+    r.addEventListener("change", () => (csvBox.hidden = srcValue() !== "csv")));
   function parseCSV(text) {
-    const lines = text.replace(/^\uFEFF/, "").trim().split(/\r?\n/).filter(Boolean);
+    const lines = text.replace(/^﻿/, "").trim().split(/\r?\n/).filter(Boolean);
     const head = lines[0].split(",").map((s) => s.trim());
     return lines.slice(1).map((l) => {
       const cells = l.split(",");
@@ -105,8 +179,8 @@
     });
   }
   $("#csvTemplate").addEventListener("click", () => {
-    const c = city(), cols = ["Latitude", "Longitude", ...FIELDS.map((f) => f.name)];
-    const row = [c.lat, c.lon, ...FIELDS.map((f) => input(f.name).value)].join(",");
+    const s = state(), cols = ["Latitude", "Longitude", ...FIELDS.map((f) => f.name)];
+    const row = [s.lat, s.lon, ...FIELDS.map((f) => input(f.name).value)].join(",");
     const csv = [cols.join(","), ...Array(24).fill(row)].join("\n");
     const a = Object.assign(document.createElement("a"), {
       href: URL.createObjectURL(new Blob([csv], { type: "text/csv" })), download: "aqi_last_24_readings.csv",
@@ -171,13 +245,19 @@
     goBtn.disabled = true;
     goBtn.textContent = "Forecasting…";
     try {
-      const c = city();
-      const body = { Latitude: c.lat, Longitude: c.lon, conditions: readForm() };
-      if (document.querySelector('input[name="src"]:checked').value === "csv") {
+      const s = state();
+      const body = { Latitude: s.lat, Longitude: s.lon, state: s.name, conditions: readForm() };
+      const src = srcValue();
+      if (src === "csv") {
         if (!csvFile.files[0]) throw new Error("Choose a CSV file with your last 24 readings.");
         body.history = parseCSV(await csvFile.files[0].text());
+      } else if (src === "live") {
+        if (!live || live.state !== s.name) await loadLive();
+        if (!live) throw new Error("Live data for this state is not available right now. Pick “Hold the conditions above steady” or try again.");
+        body.history = live.rows;
+      } else {
+        delete body.state; // steady: do not let the server fetch history
       }
-      if (outlookEl.open) body.outlook = readOutlook();
       $("#weekError").hidden = true;
       renderWeek(await api("/api/forecast/", body));
     } catch (e) {
@@ -191,5 +271,5 @@
     }
   });
 
-  predict();
+  loadLive();
 })();

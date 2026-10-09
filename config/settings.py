@@ -34,3 +34,14 @@ LSTM_TARGET_IS_NEXT_STEP = False
 # Used only when ml_models/lstm_y_scaler.pkl is missing AND the LSTM output looks scaled (0-1).
 # Maps the output back as out * (hi - lo) + lo. Set to the min/max AQI you trained on, or None to disable.
 LSTM_OUTPUT_RANGE = (0, 500)
+
+# --- Live data (Open-Meteo) -----------------------------------------------
+# Timezone used when asking Open-Meteo for "the last 24 hours" is fixed to Asia/Kolkata in
+# forecast/openmeteo.py. Nothing to configure: the API is free and needs no key.
+# Logging: show Open-Meteo problems in the runserver console.
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "handlers": {"console": {"class": "logging.StreamHandler"}},
+    "loggers": {"forecast": {"handlers": ["console"], "level": "INFO"}},
+}
