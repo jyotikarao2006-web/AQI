@@ -1,0 +1,98 @@
+{% load static %}<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AQI forecaster</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{% static 'forecast/app.css' %}">
+</head>
+<body>
+  <header class="top">
+    <h1>AQI forecaster</h1>
+    <label class="city">State
+      <select id="state"></select>
+    </label>
+  </header>
+
+  <main>
+    <section class="hero" aria-live="polite">
+      <p class="kicker">Predicted air quality for these conditions</p>
+      <p class="verdict" id="catName">Checking…</p>
+      <div class="ruler">
+        <div class="track">
+          <div class="bar" id="bar"></div>
+          <div class="marker" id="marker"><span id="aqiNum">–</span></div>
+        </div>
+        <div class="names" id="bandNames"></div>
+      </div>
+      <p class="advice" id="advice"></p>
+      <p class="live-status" id="liveStatus" aria-live="polite"></p>
+      <p class="error" id="error" role="alert" hidden></p>
+    </section>
+
+    <section class="block" id="last24">
+      <div class="block-head">
+        <h2>Last 24 hours</h2>
+        <button type="button" class="presets-btn" id="refreshLive">Refresh</button>
+      </div>
+      <p class="note" id="liveMeta">Choose a state to load its last 24 hours of air quality and weather.</p>
+      <p class="error" id="liveError" role="alert" hidden></p>
+      <div id="liveResult" hidden>
+        <div class="chart"><canvas id="liveChart" aria-label="Estimated AQI for each of the last 24 hours"></canvas></div>
+        <div class="table-wrap">
+          <table id="liveTable"></table>
+        </div>
+      </div>
+    </section>
+
+    <section class="block" id="conditions">
+      <div class="block-head">
+        <h2>Conditions</h2>
+        <div class="presets" role="group" aria-label="Example conditions">
+          <button type="button" data-preset="monsoon">Clean monsoon day</button>
+          <button type="button" data-preset="typical">Typical city day</button>
+          <button type="button" data-preset="smog">Winter smog</button>
+        </div>
+      </div>
+      <form id="form" onsubmit="return false"><div class="fields" id="fields"></div></form>
+    </section>
+
+    <section class="block" id="week">
+      <div class="block-head">
+        <h2>Next 7 days</h2>
+        <button type="button" class="primary" id="goForecast">Forecast the week</button>
+      </div>
+
+      <div class="controls">
+        <fieldset>
+          <legend>Starting point</legend>
+          <label class="radio"><input type="radio" name="src" value="live" checked> Use the last 24 hours loaded for the selected state (Open-Meteo)</label>
+          <label class="radio"><input type="radio" name="src" value="steady"> Hold the conditions above steady for the past 24 steps</label>
+          <label class="radio"><input type="radio" name="src" value="csv"> Use my own last 24 readings</label>
+          <div class="csv" id="csvBox" hidden>
+            <input type="file" id="csvFile" accept=".csv">
+            <button type="button" class="link" id="csvTemplate">Download a CSV template</button>
+          </div>
+        </fieldset>
+        
+      </div>
+
+      <p class="error" id="weekError" role="alert" hidden></p>
+      <p class="empty" id="weekEmpty">Set the conditions, then forecast the week.</p>
+      <div id="weekResult" hidden>
+        <p class="trend" id="trend"></p>
+        <p class="note" id="scaleNote" hidden></p>
+        <div class="chart"><canvas id="chart" aria-label="Forecast AQI for the next 7 days"></canvas></div>
+        <ul class="days" id="days"></ul>
+      </div>
+    </section>
+  </main>
+
+  {{ config|json_script:"config" }}
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <script src="{% static 'forecast/app.js' %}"></script>
+</body>
+</html>
